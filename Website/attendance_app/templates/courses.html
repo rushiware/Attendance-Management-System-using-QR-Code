@@ -1,0 +1,27 @@
+{% extends 'index.html' %}  
+{% load static %}
+
+{% block title %}Courses{% endblock title %}
+
+{% block main-content %}
+<div class="container text-center mt-4">
+    <h3 style="text-decoration: underline;">Courses</h3>
+
+    <div class="row">
+    {% for c in courses %}
+        <div class="col-md-4 mt-3">
+            <div class="card" style="width: 18rem;">
+                <div class="card-body">
+                    <h5 class="card-title">{{c.Course_Name}}</h5>
+                    <p class="card-text">{{c.Course_Code}} <span class="badge badge-success">{{c.Year}}</span></p>
+                    <a href="{% url 'view_courses' branch c.Year c.Course_Code %}" class="btn btn-primary mt-2">View Details <span style="font-size: 1rem;">&rarr;</span></a>
+                </div>
+            </div>
+        </div>
+        {% if forloop.counter|divisibleby:3 and not forloop.last %}
+          </div><div class="row">
+        {% endif %}
+    {% endfor %}
+    </div>
+</div>
+{% endblock main-content %}

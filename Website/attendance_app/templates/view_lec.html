@@ -1,0 +1,236 @@
+{% extends 'index.html' %}  
+{% load static %}
+
+{% block title %}Lectures{% endblock title %}
+
+{% block main-content %}
+<div class="container text-center mt-4">
+    {% for c in course %}
+        <h3>{{c.Course_Name}} ({{c.Course_Code}})</h3>
+    {% endfor %}
+
+    <h4 id="lec_txt" class="mt-3" style="text-decoration: underline;">Lectures</h4>
+
+    <h5 class="text-success" style="text-align: right;">Total Lectures = <span id="total-lec"></span></h5>
+
+    <div class="modal fade" id="studentModal" tabindex="-1" role="dialog" aria-labelledby="studentModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="studentModalLabel">Present Students</h5>
+              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+            <div class="modal-body">
+                <div>
+                    <label class="sr-only" for="inlineFormInputGroup">Search</label>
+                    <div class="input-group mb-2">
+                        <div class="input-group-prepend">
+                            <div class="input-group-text" style="background-color: #ffc107;">&#128269;</div>
+                        </div>
+                        <input style="border: 2px solid #ffc107;" type="text" class="form-control srch-ip" id="searchPresStud" placeholder="Search by PRN...">
+                    </div>
+                </div>
+
+                <h3 id="pres-stud-not-found" class="text-danger mt-3" style="display: none;">No Students found !!</h3>
+
+              <div class="table-responsive" id="pres-stud-tb">
+                <table id="pres-stud-tb" class="table table-bordered mt-4">
+                  <thead>
+                    <tr>
+                      <th style="background-image: linear-gradient(315deg, #002fff 0%, #0084ff 74%); color: white;" space="col">Sr. No.</th>
+                      <th style="background-image: linear-gradient(315deg, #002fff 0%, #0084ff 74%); color: white;" space="col">PRN</th>
+                    </tr>
+                  </thead>
+                  <tbody id="presStudTable">
+
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    <div class="mt-3">
+      <div class="row">
+        <div class="ml-3">
+          <input type="date" id="dt_picker" class="form-control" placeholder="Select date" />
+        </div>
+
+        <div class="ml-3">
+          <input type="time" id="tm_picker" class="form-control" placeholder="Select time" />
+        </div>
+
+        <div>
+          <button class="btn btn-primary ml-3" onclick="srch()">Search</button>
+        </div>
+
+        <div>
+          <button class="btn btn-success ml-3" id="show-all-lec">Show All Lectures</button>
+        </div>
+      </div>
+    </div>
+
+    <h3 id="lec-not-found" class="text-danger mt-3">No Lectures found !!</h3>
+
+    <div class="table-responsive" id="lec-tb-resp">
+      <table id="lec-tb" style="background-color: white !important;" class="mt-4 table table-bordered">
+          <thead>
+          <tr>
+          <th style="background-image: linear-gradient(315deg, #002fff 0%, #0084ff 74%); color: white;" scope="col">Sr. No.</th>
+          <th style="background-image: linear-gradient(315deg, #002fff 0%, #0084ff 74%); color: white;" scope="col">Date</th>
+          <th style="background-image: linear-gradient(315deg, #002fff 0%, #0084ff 74%); color: white;" scope="col">Time</th>
+          <th style="background-image: linear-gradient(315deg, #002fff 0%, #0084ff 74%); color: white;" scope="col">Present Students</th>
+          </tr>
+      </thead>
+      <tbody id="lecTable">
+          
+      </tbody>
+      </table>
+  </div>
+</div>
+
+{% block my-js %}
+<script>
+    function decodeHtmlEntities(encodedString) {
+        var textarea = document.createElement("textarea");
+        textarea.innerHTML = encodedString;
+        return textarea.value;
+    }
+
+    const lec_from_backend = "{{lectures}}"
+    const decoded_lec = decodeHtmlEntities(lec_from_backend)
+    const lec = JSON.parse(decoded_lec.replace(/'/g, '"'))
+    const lec_not_found_msg = $('#lec-not-found');
+    const lec_tb = $("#lec-tb");
+
+    // Sort the lectures by timestamp
+    lec.sort((a, b) => a.Timestamp - b.Timestamp);
+
+    function renderLec(lectures) {
+        const lecTable = $('#lecTable');
+        lecTable.empty();
+
+        lec_not_found_msg.hide();
+        lec_tb.show();
+
+        $("#total-lec").text(lectures.length)
+
+        if (lectures.length === 0) {
+            lec_not_found_msg.show();
+            lec_tb.hide();
+        }
+
+        lectures.forEach((l, idx) => {
+            const studCount = Object.keys(l.Present_Students).length;
+            const row = `<tr>
+                            <td style="font-weight: bold;">${idx+1}.</td>
+                            <td>${l.Date}</td>
+                            <td>${l.Time}</td>
+                            <td>${l.Present_Students[0] ? `<a href="#" data-toggle="modal" data-target="#studentModal" onclick="populateModal(${idx})">${studCount}</a>` : 0}</td>
+                        </tr>`;
+            lecTable.append(row);
+        });
+    }
+
+    renderLec(lec);
+
+    // Seacrhing
+    $("#show-all-lec").hide();
+    document.getElementById('dt_picker').setAttribute('max', new Date().toISOString().split('T')[0]);
+
+    function srch(){
+      const dt = document.getElementById('dt_picker').value;
+      const tm = document.getElementById('tm_picker').value;
+      
+      if (dt !== '' && tm !== ''){
+        const filteredLec = lec.filter(lecture => lecture.Date === formatDate(dt) && lecture.Time === formatTime(tm))
+        $("#lec_txt").text(`Lectures (${formatDate(dt)}) [${formatTime(tm)}]`);
+        renderLec(filteredLec);
+        $("#show-all-lec").show();
+      }
+      else if(dt !== '' && tm === ''){
+        const filteredLec = lec.filter(lecture => lecture.Date === formatDate(dt))
+        $("#lec_txt").text(`Lectures (${formatDate(dt)})`);
+        renderLec(filteredLec);
+        $("#show-all-lec").show();
+      }
+      else if(dt === '' && tm !== ''){
+        const filteredLec = lec.filter(lecture => lecture.Time === formatTime(tm))
+        $("#lec_txt").text(`Lectures [${formatTime(tm)}]`);
+        renderLec(filteredLec);
+        $("#show-all-lec").show();
+      }
+      else{
+        alert("Invalid Date/Time!\nSpecify Date or Time (or both) to search!")
+      }
+    }
+
+    // Format date in dd-mm-yyyy
+    function formatDate(dateString) {
+      const [year, month, day] = dateString.split('-');
+      return `${day}-${month}-${year}`;
+    }
+
+    // Format time in 12-hr format
+    function formatTime(timeString) {
+      const [hours, minutes] = timeString.split(':');
+      const formattedHours = hours % 12 || 12; // Handle 0 as 12 in 12-hour format
+      const formattedHoursWithZeroes = String(formattedHours).padStart(2, '0');
+      const period = hours >= 12 ? 'PM' : 'AM';
+      return `${formattedHoursWithZeroes}:${minutes} ${period}`;
+    }
+
+    // Show all lec
+    $('#show-all-lec').on('click', function(){
+      $("#lec_txt").text("Lectures");
+      $("#dt_picker").val('');
+      $("#tm_picker").val('');
+      renderLec(lec)
+      $('#show-all-lec').hide();
+    })
+
+    // Modal
+    const presStudTable = $('#presStudTable');
+    const pres_stud_not_found_msg = $('#pres-stud-not-found');
+    const pres_stud_tb = $("#pres-stud-tb");
+
+    function populateModal(idx) {
+        const studentIds = lec[idx]['Present_Students'];
+        presStudTable.empty();
+
+        // Populate the modal with student IDs
+        studentIds.forEach((studentId, idx) => {
+            const row = `<tr>
+                            <td style="font-weight: bold;">${idx+1}.</td>
+                            <td>${studentId}</td>
+                        </tr>`;
+            presStudTable.append(row);
+        });
+
+        // Search for Modal
+        $('#searchPresStud').on('keyup', function() {
+            const srchStudTerm = $(this).val().toLowerCase();
+
+            const visibleRows = $('#presStudTable tr').filter(function() {
+                const text = $(this).find('td:not(:first-child)').text().toLowerCase();
+                const isVisible = text.includes(srchStudTerm);
+                $(this).toggle(isVisible);
+                return isVisible;
+            });
+
+            // Toggle the msg & table visibility based on search results
+            const noRecordsFound = visibleRows.length === 0;
+            pres_stud_not_found_msg.toggle(noRecordsFound);
+            pres_stud_tb.toggle(!noRecordsFound);
+        });
+    }
+</script>
+{% endblock my-js %}
+
+{% endblock main-content %}

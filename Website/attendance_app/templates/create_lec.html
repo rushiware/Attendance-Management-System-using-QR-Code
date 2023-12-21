@@ -1,0 +1,158 @@
+{% extends 'index.html' %}  
+{% load static %}
+
+{% block title %}Create Session{% endblock title %}
+
+{% block main-content %}
+
+<center>
+    <div class="container mt-4">
+        <h3>{{course}} ({{c_code}})</h3>
+        <div style="display: flex; justify-content: space-between;">
+            <p><span style="font-weight: bold;">Date:</span> {{c_dt}}</p>
+            <p><span style="font-weight: bold;">Time:</span> {{c_tm}}</p>
+        </div>
+        <h4 id="qr_txt" class="text-success mt-3">QR Code generated successfully!</h4>
+        <button id="dispQR-btn" class="btn btn-success mt-3" onclick="qrFull()">Display QR</button>
+        <div class="container m-0 p-0" id="qrCode" style="display: none;">
+            <h4 id="timer" style="background-color: white; font-size: 3rem; height: auto; width: auto;"></h4>
+            <img class="img-fluid" id="qrCodeImg" style="margin-top: 1rem; height: min-content; width: min-content;"  src="{{img_url}}" alt="QR Code">
+            <button id="exit-btn" class="btn btn-warning text-white" style="display: none;" onclick="qrExitFull()">Exit Full Screen</button>
+        </div>
+    </div>
+    </center>
+{% endblock main-content %}
+
+{% block my-js %}
+<script>
+    var qr = document.getElementById("qrCode");
+    var qr_img = document.getElementById("qrCodeImg");
+    var exit_btn = document.getElementById("exit-btn");
+    var tm = document.getElementById('timer');
+    let ct = 60;
+    let QRInterval;
+    var img_url = "{{img_url}}"
+    var insertKey = "{{insert_key}}";
+    var branch = "{{branch}}";
+    var yr = "{{yr}}";
+    var course = "{{course}}";
+    
+    function updateTimer() {
+        ct = ct - 1;
+        let mins = Math.floor(ct / 60);
+        let secs = ct % 60;
+        let timer = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+        if (mins === 0 && secs === 0) {
+            console.log("Timer ended!");
+            clearInterval(QRInterval);
+            updateStatusToEnded();
+            qr_img.style.display = "none";
+            exit_btn.style.display = "block";
+        }
+
+        // Generate QR after every 10 seconds
+        if (secs % 10 === 0) {
+            update_QR();
+        }
+
+        // Update the DOM element with id 'timer' with the formatted time
+        tm.innerText = timer;
+    }
+
+    function handleFullscreenChange() {
+        if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
+            // Element is in full screen mode
+            qr.style.display = "block";
+        } else {
+            // Element is not in full screen mode
+            clearInterval(QRInterval);
+            updateStatusToEnded();
+            update_QR();
+            qr.style.display = "none";
+            $("#dispQR-btn").css("display","none");
+            $("#qr_txt").text("This session has ended!").removeClass("text-success").addClass("text-danger");
+            window.location.href = '{% url "lec_end" branch yr c_code %}';
+        }
+    }
+
+    qr.addEventListener("fullscreenchange", handleFullscreenChange);
+    qr.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    qr.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    qr.addEventListener("MSFullscreenChange", handleFullscreenChange);
+    
+    function qrFull(){
+        // Start the timer and update it every second
+        let mins = Math.floor(ct / 60);
+        let secs = ct % 60;
+        let timer = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        tm.innerText = timer;
+        QRInterval = setInterval(updateTimer, 1000);
+
+        // Display QR in full screen
+        if (qr.requestFullscreen) {
+            qr.requestFullscreen();
+        } else if (qr.mozRequestFullScreen) { 
+            qr.mozRequestFullScreen();
+        } else if (qr.webkitRequestFullscreen) { 
+            qr.webkitRequestFullscreen();
+        } else if (qr.msRequestFullscreen) { 
+            qr.msRequestFullscreen();
+        }
+    }
+
+    function qrExitFull(){
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+    }
+
+    // Firebase
+    var firebaseConfig = {
+        apiKey: "AIzaSyDMt7O82KqYYUrtcROWEWEXNpwOIWj8riI",
+        authDomain: "attendance-system-2f77d.firebaseapp.com",
+        databaseURL: "https://attendance-system-2f77d-default-rtdb.firebaseio.com",
+        projectId: "attendance-system-2f77d",
+        storageBucket: "attendance-system-2f77d.appspot.com",
+        messagingSenderId: "935686411905",
+        appId: "1:935686411905:web:d79a0ba90beee401185f80",
+        measurementId: "G-DZ3DQJYY31"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+
+    // Get a reference to database
+    var database = firebase.database();
+
+    function updateStatusToEnded(){
+        var updates = {};
+        updates['/Courses/'+ branch + '/' + yr + '/'+ course + '/Lectures/' + insertKey + '/Status'] = 'Ended';
+
+        return database.ref().update(updates)
+            .then(function() {
+                console.log("Status updated to 'Ended'.");
+            })
+            .catch(function(error) {
+                console.error("Error updating status: ", error);
+            });
+    }
+
+    function update_QR(){
+        $.ajax({
+        type: "POST",
+        url: "{% url 'gen_qr' %}",   
+        data: {csrfmiddlewaretoken: '{{ csrf_token }}',
+              branch: branch, year: yr, subject: course, insert_key: insertKey},
+        success:  function(response){
+               $("#qrCodeImg").attr("src", img_url+'?timestamp=' + new Date().getTime());
+            }
+        });
+    }
+</script>
+{% endblock my-js %}

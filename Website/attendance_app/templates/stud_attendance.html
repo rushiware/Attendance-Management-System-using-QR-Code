@@ -1,0 +1,187 @@
+{% extends 'index.html' %}  
+{% load static %}
+
+{% block title %}Lectures{% endblock title %}
+
+{% block main-content %}
+<div class="container text-center mt-4">
+    {% for c in course %}
+        <h3 id="course_txt">{{c.Course_Name}} ({{c.Course_Code}})</h3>
+    {% endfor %}
+
+    <h4 id="stud_att_txt" class="mt-3" style="text-decoration: underline;">Students Attendance</h4>
+
+    <h5 class="text-success" style="text-align: right;">Total Students = <span id="total-stud-att"></span></h5>
+
+    <div class="mt-3" style="display: flex; justify-content: space-between;">
+        <div class="row">
+            <div class="dropdown ml-3">
+                <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    &#9778; Sort Attendance
+                </button>
+                <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                  <a class="dropdown-item att-item dropdown-item-hvr" href="#">More than 75%</a>
+                  <a class="dropdown-item att-item dropdown-item-hvr" href="#">Between 50-75%</a>
+                  <a class="dropdown-item att-item dropdown-item-hvr" href="#">Less than 50%</a>
+                </div>
+            </div>
+
+            <div>
+                <button class="btn btn-orange text-white ml-3" onclick="downloadPDF()">Download List <span style="font-weight: bold; transform: rotate(90deg); display: inline-block;">&#x21e5;</span></button>
+            </div>
+
+            <div>
+                <button class="btn btn-success ml-3" id="show-all-stud-att">Show All Students</button>
+            </div>
+        </div>
+
+        <div>
+            <label class="sr-only" for="inlineFormInputGroup">Search</label>
+            <div class="input-group mb-2">
+                <div class="input-group-prepend">
+                <div class="input-group-text" style="background-color: #ffc107;">&#128269;</div>
+                </div>
+                <input style="border: 2px solid #ffc107;" type="text" class="form-control srch-ip" id="searchStudAtt" placeholder="Search by anything...">
+            </div>
+        </div>
+    </div>
+
+    <h3 id="stud-att-not-found" class="text-danger mt-3">No Students found !!</h3>
+
+    <div class="table-responsive" id="stud-att-tb-resp">
+        <table id="stud-att-tb" style="background-color: white !important;" class="mt-4 table table-bordered">
+            <thead>
+            <tr>
+            <th style="background-image: linear-gradient(315deg, #002fff 0%, #0084ff 74%); color: white;" scope="col">Sr. No.</th>
+            <th style="background-image: linear-gradient(315deg, #002fff 0%, #0084ff 74%); color: white;" scope="col">PRN</th>
+            <th style="background-image: linear-gradient(315deg, #002fff 0%, #0084ff 74%); color: white;" scope="col">Name</th>
+            <th style="background-image: linear-gradient(315deg, #002fff 0%, #0084ff 74%); color: white;" scope="col">Attendance</th>
+            </tr>
+        </thead>
+        <tbody id="studAttTable">
+            
+        </tbody>
+        </table>
+    </div>
+</div>
+
+{% block my-js %}
+<script>
+    function decodeHtmlEntities(encodedString) {
+        var textarea = document.createElement("textarea");
+        textarea.innerHTML = encodedString;
+        return textarea.value;
+    }
+
+    const stud_att_from_backend = "{{students}}"
+    const decoded_stud_att = decodeHtmlEntities(stud_att_from_backend)
+    const stud_att = JSON.parse(decoded_stud_att.replace(/'/g, '"'))
+    const stud_att_not_found_msg = $('#stud-att-not-found');
+    const stud_att_tb = $("#stud-att-tb");
+    let sortedStud = [];
+
+    function renderStudAtt(students) {
+        const studAttTable = $('#studAttTable');
+        studAttTable.empty();
+
+        // Sort the students by PRN
+        students.sort((a, b) => a.PRN.localeCompare(b.PRN));
+
+        stud_att_not_found_msg.hide();
+        stud_att_tb.show();
+
+        $("#total-stud-att").text(students.length)
+
+        if (students.length === 0) {
+            stud_att_not_found_msg.show();
+            stud_att_tb.hide();
+        }
+
+        students.forEach((s, idx) => {
+            const att_val = parseFloat(s.Attendance)
+            const attendance = att_val % 1 === 0 ? att_val.toFixed(0) : s.Attendance;
+            const row = `<tr>
+                            <td style="font-weight: bold;">${idx+1}.</td>
+                            <td>${s.PRN}</td>
+                            <td>${s.Name}</td>
+                            <td style="color: ${attendance >= 75 ? 'green' : (attendance < 75 && attendance >= 50 ? 'orange' : 'red')}">${attendance} %</td>
+                        </tr>`;
+            studAttTable.append(row);
+        });
+    }
+
+    // Initial rendering of Attendance
+    function sortStudAtt(range) {
+        if (range === "More than 75%") {
+            sortedStud = stud_att.filter(s => parseFloat(s.Attendance) >= 75.00);
+        }
+        else if (range === "Between 50-75%"){
+            sortedStud = stud_att.filter(s => parseFloat(s.Attendance) < 75.00 && parseFloat(s.Attendance) >= 50.00);
+        }
+        else if (range === "Less than 50%"){
+            sortedStud = stud_att.filter(s => parseFloat(s.Attendance) < 50.00);
+        }
+        else {
+            sortedStud = [...stud_att]; // Copy all students if no range filter
+        }
+
+        renderStudAtt(sortedStud);
+    }
+
+    sortStudAtt('');
+    $('#show-all-stud-att').hide();
+
+    // Sorting
+    $('.att-item').on('click', function() {
+      const selectedAtt = $(this).text();
+      $("#stud_att_txt").text(`Students Attendance (${selectedAtt})`);
+      $('#show-all-stud-att').show();
+      sortStudAtt(selectedAtt);
+    });
+
+    // Search functionality
+    $('#searchStudAtt').on('input', function() {
+        const studSrchTerm = $(this).val().toLowerCase();
+        const filteredStudAtt = sortedStud.filter(s => {
+            return Object.values(s).some(value => value.toLowerCase().includes(studSrchTerm));
+        });
+        renderStudAtt(filteredStudAtt);
+    });
+
+    // Show all students
+    $('#show-all-stud-att').on('click', function(){
+        $("#stud_att_txt").text("Students Attendance");
+        sortStudAtt('');
+        $('#show-all-stud-att').hide();
+    })
+
+    // Download list as PDF
+    function downloadPDF(){
+        const config = {
+            filename: document.getElementById("course_txt").innerText+' - '+document.getElementById("stud_att_txt").innerText+'.pdf',
+            margin: 10, // Adds margin in mm from all(top, right, bottom, left)
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        };
+
+        const containerDiv = document.createElement('div');
+        containerDiv.style.width = '100%';
+        containerDiv.style.paddingRight = '15px';
+        containerDiv.style.paddingLeft = '15px';
+        containerDiv.style.marginRight = 'auto';
+        containerDiv.style.marginLeft = 'auto';
+        containerDiv.style.textAlign = 'center';
+
+        // Append heading and table to the container
+        containerDiv.appendChild(document.getElementById("course_txt").cloneNode(true));
+        containerDiv.appendChild(document.getElementById("stud_att_txt").cloneNode(true));
+        const stud_att_resp = document.getElementById("stud-att-tb-resp").cloneNode(true);
+        stud_att_resp.classList.remove("table-responsive")
+        containerDiv.appendChild(stud_att_resp.querySelector("table"));
+
+        html2pdf(containerDiv, config);
+    }
+
+</script>
+{% endblock my-js %}
+
+{% endblock main-content %}

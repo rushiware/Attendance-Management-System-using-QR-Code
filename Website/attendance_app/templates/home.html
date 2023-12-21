@@ -1,0 +1,14 @@
+{% extends 'index.html' %}  
+{% load static %}
+
+{% block title %}Home{% endblock title %}
+
+{% block main-content %}
+<div class="container text-center mt-4">
+    <h3>Dynamic QR Attendance System</h3>
+
+    <div class="img-fluid mt-4">
+        <img style="border: 2px solid black; border-radius: 1.5rem; height: 350px; width: 350px;" src="{% static 'attendance_logo.jpg' %}" alt="">
+    </div>
+</div>
+{% endblock main-content %}
